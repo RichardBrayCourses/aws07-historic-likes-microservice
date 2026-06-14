@@ -24,7 +24,7 @@ async function main() {
   });
   console.log("");
 
-  const bucketName = await getParameter("/core/images/bucket-name");
+  const bucketName = await getParameter("/photos/images/bucket-name");
   const client = await createDbClient();
 
   try {

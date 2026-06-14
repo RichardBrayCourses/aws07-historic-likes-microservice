@@ -7,7 +7,7 @@ async function main() {
   }
 
   const [secretArn, credentials] = await Promise.all([
-    getParameter("/core/rds/secret-arn"),
+    getParameter("/photos/rds/secret-arn"),
     getRdsCredentials(),
   ]);
   const databaseName = getDatabaseName();

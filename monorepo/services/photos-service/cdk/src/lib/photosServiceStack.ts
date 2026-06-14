@@ -72,7 +72,7 @@ export class PhotosServiceStack extends Stack {
         actions: ["ssm:GetParameter"],
         resources: [
           `arn:aws:ssm:${this.region}:${this.account}:parameter/rds/*`,
-          `arn:aws:ssm:${this.region}:${this.account}:parameter/core/rds/*`,
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/photos/rds/*`,
         ],
       }),
     );
@@ -88,7 +88,7 @@ export class PhotosServiceStack extends Stack {
       restApiName: "photos-service",
       cloudWatchRole: false,
       deployOptions: {
-        stageName: "core",
+        stageName: "photos",
       },
       defaultCorsPreflightOptions: {
         allowOrigins: Cors.ALL_ORIGINS,

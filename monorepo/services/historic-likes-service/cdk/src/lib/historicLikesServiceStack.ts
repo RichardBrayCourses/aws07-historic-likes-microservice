@@ -135,7 +135,7 @@ export class HistoricLikesServiceStack extends Stack {
     new events.Rule(this, "UsersProjectionRule", {
       eventBus: photosEventBus,
       eventPattern: {
-        source: [EVENT_SOURCES.core],
+        source: [EVENT_SOURCES.photos],
         detailType: [
           EVENT_DETAIL_TYPES.userCreated,
           EVENT_DETAIL_TYPES.userUpdated,
@@ -147,7 +147,7 @@ export class HistoricLikesServiceStack extends Stack {
     new events.Rule(this, "ImagesProjectionRule", {
       eventBus: photosEventBus,
       eventPattern: {
-        source: [EVENT_SOURCES.core],
+        source: [EVENT_SOURCES.photos],
         detailType: [
           EVENT_DETAIL_TYPES.imageCreated,
           EVENT_DETAIL_TYPES.imageUpdated,

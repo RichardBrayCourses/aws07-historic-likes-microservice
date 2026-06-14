@@ -1,8 +1,8 @@
 import { PublishCommand, SNSClient } from "@aws-sdk/client-sns";
 import {
   EVENT_DETAIL_TYPES,
-  type CoreAllLikesDeletedEvent,
-  type CoreLikeEvent,
+  type PhotosAllLikesDeletedEvent,
+  type PhotosLikeEvent,
 } from "@uptick/events";
 import { randomUUID } from "node:crypto";
 
@@ -10,7 +10,7 @@ const sns = new SNSClient({});
 
 type LikeEventChange = "created" | "deleted";
 
-type PublishLikeEventDetail = Omit<CoreLikeEvent, "eventId" | "eventType"> & {
+type PublishLikeEventDetail = Omit<PhotosLikeEvent, "eventId" | "eventType"> & {
   change: LikeEventChange;
 };
 
@@ -18,7 +18,7 @@ export async function publishLikeEvent(detail: PublishLikeEventDetail) {
   const topicArn = process.env.LIKES_EVENTS_TOPIC_ARN;
   if (!topicArn) return;
 
-  const event: CoreLikeEvent = {
+  const event: PhotosLikeEvent = {
     eventId: randomUUID(),
     eventType:
       detail.change === "created"
@@ -42,7 +42,7 @@ export async function publishAllLikesDeletedEvent(deletedLikes: number) {
   const topicArn = process.env.LIKES_EVENTS_TOPIC_ARN;
   if (!topicArn) return;
 
-  const event: CoreAllLikesDeletedEvent = {
+  const event: PhotosAllLikesDeletedEvent = {
     eventId: randomUUID(),
     eventType: EVENT_DETAIL_TYPES.allLikesDeleted,
     deletedLikes,

@@ -6,8 +6,8 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
   EVENT_DETAIL_TYPES,
   EVENT_SOURCES,
-  type CoreImageProjectionEvent,
-  type CoreUserProjectionEvent,
+  type PhotosImageProjectionEvent,
+  type PhotosUserProjectionEvent,
 } from "@uptick/events";
 import { readdir, readFile } from "node:fs/promises";
 import { extname, join, parse, resolve } from "node:path";
@@ -52,7 +52,7 @@ function keyFor(fileName: string, index: number) {
 }
 
 export async function initImages() {
-  const bucketName = await getParameter("/core/images/bucket-name");
+  const bucketName = await getParameter("/photos/images/bucket-name");
   const eventBusName = await getParameter("/photos/events/event-bus-name");
   const photosDir = resolve(
     process.env.PHOTOS_DIR ?? "../../../photos-to-upload",
@@ -101,7 +101,7 @@ export async function initImages() {
       const imageId = String(imageResult.rows[0].id);
       await publishEvent(
         eventBusName,
-        EVENT_SOURCES.core,
+        EVENT_SOURCES.photos,
         EVENT_DETAIL_TYPES.imageCreated,
         {
           eventType: EVENT_DETAIL_TYPES.imageCreated,
@@ -110,7 +110,7 @@ export async function initImages() {
           title,
           description: DEFAULT_DESCRIPTION,
           occurredAt: new Date().toISOString(),
-        } satisfies CoreImageProjectionEvent,
+        } satisfies PhotosImageProjectionEvent,
       );
 
       console.log(`Seeded ${photoName} as ${key} (author: ${author.sub})`);
@@ -140,7 +140,7 @@ async function seedUsersInDatabase(
     );
     await publishEvent(
       eventBusName,
-      EVENT_SOURCES.core,
+      EVENT_SOURCES.photos,
       EVENT_DETAIL_TYPES.userCreated,
       {
         eventType: EVENT_DETAIL_TYPES.userCreated,
@@ -148,7 +148,7 @@ async function seedUsersInDatabase(
         email: user.email,
         nickname: user.nickname,
         occurredAt: new Date().toISOString(),
-      } satisfies CoreUserProjectionEvent,
+      } satisfies PhotosUserProjectionEvent,
     );
   }
 

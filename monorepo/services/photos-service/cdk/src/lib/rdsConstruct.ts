@@ -64,7 +64,7 @@ export class PhotosRds extends Construct {
     });
 
     new StringParameter(this, "DbSecretArnParam", {
-      parameterName: "/core/rds/secret-arn",
+      parameterName: "/photos/rds/secret-arn",
       stringValue: this.cluster.secret!.secretArn,
       description: "ARN of the Aurora credentials secret in Secrets Manager",
     });

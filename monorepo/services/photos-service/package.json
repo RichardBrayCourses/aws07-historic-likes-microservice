@@ -6,8 +6,8 @@
   "scripts": {
     "type-check": "tsc --noEmit && tsc --noEmit -p cdk/tsconfig.json",
     "dev": "tsx  src/local.ts",
-    "deploy": "cdk deploy photos-service-stack --require-approval never --app \"tsx ./cdk/src/bin/core.ts\" && pnpm run database:migrate",
-    "destroy": "cdk destroy photos-service-stack --force --require-approval never --app \"tsx ./cdk/src/bin/core.ts\"",
+    "deploy": "cdk deploy photos-service-stack --require-approval never --app \"tsx ./cdk/src/bin/photos.ts\" && pnpm run database:migrate",
+    "destroy": "cdk destroy photos-service-stack --force --require-approval never --app \"tsx ./cdk/src/bin/photos.ts\"",
     "database:migrate": "tsx scripts/src/database-migrate.ts",
     "database:reset": "tsx scripts/src/database-migrate.ts reset",
     "database:show-secret": "tsx scripts/src/database-show-secret.ts",

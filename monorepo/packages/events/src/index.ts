@@ -1,6 +1,6 @@
 export const EVENT_SOURCES = {
   cognito: "uptick.cognito",
-  core: "uptick.core",
+  photos: "uptick.photos",
 } as const;
 
 export const EVENT_DETAIL_TYPES = {
@@ -23,7 +23,7 @@ export type CognitoUserCreatedEvent = {
   occurredAt: string;
 };
 
-export type CoreUserProjectionEvent = {
+export type PhotosUserProjectionEvent = {
   eventType:
     | typeof EVENT_DETAIL_TYPES.userCreated
     | typeof EVENT_DETAIL_TYPES.userUpdated
@@ -34,7 +34,7 @@ export type CoreUserProjectionEvent = {
   occurredAt: string;
 };
 
-export type CoreImageProjectionEvent = {
+export type PhotosImageProjectionEvent = {
   eventType:
     | typeof EVENT_DETAIL_TYPES.imageCreated
     | typeof EVENT_DETAIL_TYPES.imageUpdated
@@ -46,7 +46,7 @@ export type CoreImageProjectionEvent = {
   occurredAt: string;
 };
 
-export type CoreLikeEvent = {
+export type PhotosLikeEvent = {
   eventId: string;
   eventType:
     | typeof EVENT_DETAIL_TYPES.likeCreated
@@ -57,7 +57,7 @@ export type CoreLikeEvent = {
   occurredAt: string;
 };
 
-export type CoreAllLikesDeletedEvent = {
+export type PhotosAllLikesDeletedEvent = {
   eventId: string;
   eventType: typeof EVENT_DETAIL_TYPES.allLikesDeleted;
   deletedLikes: number;
@@ -66,7 +66,7 @@ export type CoreAllLikesDeletedEvent = {
 
 export type DomainEvent =
   | CognitoUserCreatedEvent
-  | CoreUserProjectionEvent
-  | CoreImageProjectionEvent
-  | CoreLikeEvent
-  | CoreAllLikesDeletedEvent;
+  | PhotosUserProjectionEvent
+  | PhotosImageProjectionEvent
+  | PhotosLikeEvent
+  | PhotosAllLikesDeletedEvent;

@@ -34,21 +34,21 @@ export class PhotosImages extends Construct {
 
     this.distributionUrl = `https://${distribution.distributionDomainName}`;
 
-    new StringParameter(this, "CloudfrontImagesBucketNameParameter", {
-      parameterName: "/core/images/bucket-name",
+    new StringParameter(this, "PhotosImagesBucketNameParameter", {
+      parameterName: "/photos/images/bucket-name",
       stringValue: this.imagesBucket.bucketName,
     });
 
-    new StringParameter(this, "CloudfrontImagesUrlParameter", {
-      parameterName: "/core/images/distribution-url",
+    new StringParameter(this, "PhotosImagesUrlParameter", {
+      parameterName: "/photos/images/distribution-url",
       stringValue: this.distributionUrl,
     });
 
-    new CfnOutput(this, "CloudfrontImagesBucketName", {
+    new CfnOutput(this, "PhotosImagesBucketName", {
       value: this.imagesBucket.bucketName,
     });
 
-    new CfnOutput(this, "CloudfrontImagesDistributionUrl", {
+    new CfnOutput(this, "PhotosImagesDistributionUrl", {
       value: this.distributionUrl,
     });
   }

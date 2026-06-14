@@ -17,7 +17,7 @@ export function getDatabaseName() {
 }
 
 export async function getRdsCredentials() {
-  const secretArn = await getParameter("/core/rds/secret-arn");
+  const secretArn = await getParameter("/photos/rds/secret-arn");
   const secretValue = await secretsClient.send(
     new GetSecretValueCommand({ SecretId: secretArn }),
   );

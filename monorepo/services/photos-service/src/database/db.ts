@@ -18,12 +18,12 @@ async function getRdsCredentials() {
   if (credentials) return credentials;
 
   const parameterResponse = await ssmClient.send(
-    new GetParameterCommand({ Name: "/core/rds/secret-arn" }),
+    new GetParameterCommand({ Name: "/photos/rds/secret-arn" }),
   );
   const secretArn = parameterResponse.Parameter?.Value;
 
   if (!secretArn) {
-    throw new Error("SSM parameter /core/rds/secret-arn did not contain a value.");
+    throw new Error("SSM parameter /photos/rds/secret-arn did not contain a value.");
   }
 
   const secretResponse = await secretsClient.send(

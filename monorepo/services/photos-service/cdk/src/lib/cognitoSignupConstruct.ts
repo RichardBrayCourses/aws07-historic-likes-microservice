@@ -71,7 +71,7 @@ export class CognitoSignup extends Construct {
       new iam.PolicyStatement({
         actions: ["ssm:GetParameter"],
         resources: [
-          `arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/core/rds/*`,
+          `arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/photos/rds/*`,
         ],
       }),
     );
@@ -83,7 +83,7 @@ export class CognitoSignup extends Construct {
     );
 
     new StringParameter(this, "CognitoSignupQueueUrlParameter", {
-      parameterName: "/core/cognito-signup/queue-url",
+      parameterName: "/photos/cognito-signup/queue-url",
       stringValue: queue.queueUrl,
     });
   }

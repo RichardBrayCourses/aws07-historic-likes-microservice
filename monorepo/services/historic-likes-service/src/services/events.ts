@@ -1,8 +1,8 @@
 import type {
-  CoreAllLikesDeletedEvent,
-  CoreImageProjectionEvent,
-  CoreLikeEvent,
-  CoreUserProjectionEvent,
+  PhotosAllLikesDeletedEvent,
+  PhotosImageProjectionEvent,
+  PhotosLikeEvent,
+  PhotosUserProjectionEvent,
   DomainEvent,
 } from "@uptick/events";
 import type { SQSEvent } from "aws-lambda";
@@ -20,7 +20,7 @@ export type QueuedUserProjectionEvent = {
   source: string;
   time: string;
   "detail-type": string;
-  detail: CoreUserProjectionEvent;
+  detail: PhotosUserProjectionEvent;
 };
 
 export type QueuedImageProjectionEvent = {
@@ -28,12 +28,12 @@ export type QueuedImageProjectionEvent = {
   source: string;
   time: string;
   "detail-type": string;
-  detail: CoreImageProjectionEvent;
+  detail: PhotosImageProjectionEvent;
 };
 
 export type QueuedLikeEvent = {
   messageId: string;
-  detail: CoreLikeEvent | CoreAllLikesDeletedEvent;
+  detail: PhotosLikeEvent | PhotosAllLikesDeletedEvent;
 };
 
 export function userProjectionEventsFromQueue(event: SQSEvent) {
@@ -54,7 +54,7 @@ export function likeEventsFromQueue(event: SQSEvent) {
 
     return {
       messageId: notification.MessageId ?? record.messageId,
-      detail: JSON.parse(message) as CoreLikeEvent | CoreAllLikesDeletedEvent,
+      detail: JSON.parse(message) as PhotosLikeEvent | PhotosAllLikesDeletedEvent,
     } satisfies QueuedLikeEvent;
   });
 }
