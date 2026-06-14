@@ -1,10 +1,14 @@
 # AWS 07 - Historic Likes Microservice
 
-This reworked version folds the original historic likes course and the later backend ownership refactor into one natural lesson. It introduces the full historic likes architecture, but starts from the independently deployable microservice layout: every service or app owns its runtime code, operational scripts, and CDK infrastructure.
+## Introduction
 
-Realtime likes are deliberately not included here. They first appear in AWS 08.
+AWS 07 is the point where the application becomes a real microservices system. The single `api` service from the previous database lesson is now the `photos-service`, and it sits alongside independently deployable `cognito-service` and `historic-likes-service` owners. Each service carries its own runtime code, scripts, and CDK app, so the AWS resources in the stack now have a clear home instead of being managed from one central infrastructure folder.
 
-## Architecture
+The new user-facing feature is photo liking. The photos service records the current like state in PostgreSQL and returns it to the gallery, while the historic likes service builds longer-term charts and tables for likes by image and by author. Those services do not share a database. When historic likes needs photo or user context owned by the photos service, that data is projected across event queues and stored in the historic service's own DynamoDB tables.
+
+The historic likes service is deliberately shaped differently from the photos service. It is still TypeScript, but it is a set of Lambda handlers using API Gateway proxy events directly rather than an Express application, and it uses DynamoDB read models instead of the photos service's PostgreSQL schema.
+
+## Mermaid Diagram
 
 ```mermaid
 %%{init: {"themeVariables": {"lineColor": "#ff1744", "edgeLabelBackground": "#334155"}, "themeCSS": ".edgeLabel rect { fill: #334155 !important; opacity: 1 !important; } .edgeLabel text, .edgeLabel span { fill: #f8fafc !important; color: #f8fafc !important; }"}}%%
@@ -98,70 +102,173 @@ flowchart LR
   style Terminal fill:#fff1f2,stroke:#e11d48,color:#0f172a
 ```
 
-## What This Version Teaches
+## Release Notes
 
-This version combines the useful work from the original AWS 07 historic likes sequence and the later backend ownership refactor:
+- **Service-owned architecture.** The previous central `cdk` package has been split into service-local CDK apps. Website hosting lives with `apps/ui`; Cognito resources live with `services/cognito-service`; the photo API, RDS database, image bucket, image CloudFront distribution, photo event bus, likes topic, seed scripts, and simulator live with `services/photos-service`; historic analytics resources live with `services/historic-likes-service`.
+- **The old API is now the photos service.** The former `services/api` boundary has been renamed and narrowed to `services/photos-service`, which better reflects what it owns: photos, users known to the app, uploads, current likes, image storage, and photo-domain events.
+- **A new historic likes microservice.** `services/historic-likes-service` is a separate TypeScript service with its own CDK stack, public REST API, SQS consumers, DynamoDB tables, reset script, and public API test script. Unlike the photos service, its HTTP entry point handles API Gateway proxy events directly rather than running through Express.
+- **Independent data ownership.** The photos service keeps operational data in PostgreSQL tables such as `registered_user`, `images`, and `image_likes`. The historic likes service keeps its own DynamoDB projections and aggregate tables. It does not reach into the photos database.
+- **Event-projected users and images.** User and image changes owned by the photos service are published to `PhotosEventBus`. The historic likes service subscribes through SQS queues and stores local user and image projection rows so analytics can be resolved without a cross-service database query.
+- **Like event fan-out.** Like and unlike actions are published to `LikesEventsTopic` as `like.created` and `like.deleted`; simulator resets publish `likes.deleted.all`. In this release the historic likes service is the subscriber, and the SNS topic leaves room for later services to join the same stream.
+- **Current likes in the gallery.** Signed-in users can like and unlike photos. The photos service records the current state in `image_likes`, and gallery responses include whether the current user has liked each photo.
+- **Historic charts and tables.** The UI can show accumulated historic activity by image and by author. The historic likes service stores 5-second bucket aggregates in DynamoDB and serves public endpoints for overview tables and per-entity charts.
+- **Repeatable demos and cleanup.** Seed, reset, and simulator scripts now live with the services that own the data. `data:seed` creates artwork authors and images, `simulator:start` creates like traffic from viewer users, and `data:reset` clears photos, historic projections, and Cognito test data in the right order.
 
-- gallery like and unlike buttons backed by Postgres
-- typed domain events in `packages/events`
-- a photos-owned EventBridge bus for user and image projection events
-- SNS fan-out for like events
-- SQS queues between event delivery and Lambda consumers
-- a separate historic likes service with DynamoDB read models
-- a public historic likes API for browser charts
-- a terminal-driven like simulator
-- a full-screen gallery analytics overlay
-- independently deployable services and app-owned CDK
-- service-owned deployment, reset, seed, and test scripts
+## How To Run
 
-The old `api` or `core-service` naming has been repatriated into `photos-service`. The photos service owns photos, users, current likes, S3 image storage, the RDS schema, the simulator, and the outbound photos event stream.
+Most day-to-day work starts in the `monorepo` folder. The root scripts are thin wrappers around service-owned scripts, so you can either run the whole stack or step into one owner when you want to inspect something more closely.
 
-## Deployable Owners
+**Install and local checks**
 
-| Owner | Path | Owns |
-| --- | --- | --- |
-| Website app | `monorepo/apps/ui` | React UI, website hosting CDK, env generation, build and upload scripts |
-| Cognito service | `monorepo/services/cognito-service` | Cognito user pool, hosted UI domain, post-confirmation Lambda, Cognito event bus, Cognito reset |
-| Photos service | `monorepo/services/photos-service` | Express API, RDS, S3, image CloudFront distribution, photos event bus, SNS likes topic, Cognito signup ingest, seed, simulator, API tests |
-| Historic likes service | `monorepo/services/historic-likes-service` | DynamoDB projections, historic like aggregates, SQS consumers, public historic likes API, historic reset and API tests |
-| Shared events | `monorepo/packages/events` | Cross-service event source, detail type, and payload contracts |
-
-Every deployable owner has its own `cdk` folder. There is no central root CDK app.
-
-```text
-monorepo/apps/ui/cdk
-monorepo/services/cognito-service/cdk
-monorepo/services/photos-service/cdk
-monorepo/services/historic-likes-service/cdk
+```bash
+cd monorepo
+pnpm install
+pnpm -C services/photos-service run dev
+pnpm -C apps/ui run dev
+pnpm run type-check
 ```
 
-## Event Model
+**Deploy the backend services**
 
-The system uses two EventBridge buses and one SNS topic because the message flows have different ownership and delivery needs.
-
-**Cognito signup events**
-
-```text
-Cognito post-confirmation Lambda
-  -> CognitoEventBus
-    -> CognitoSignupQueue
-      -> photos-service cognitoSignupConsumer
-        -> Postgres registered_user
+```bash
+pnpm run bootstrap-up
+pnpm run cognito-service:deploy
+pnpm run photos-service:deploy
+pnpm run historic-likes-service:deploy
 ```
 
-Cognito owns authentication and publishes `user.created` with source `uptick.cognito`. The photos service owns the Postgres write model, so it consumes the event and inserts or updates `registered_user`.
+**Deploy the UI**
 
-**Photos projection events**
-
-```text
-photos-service
-  -> PhotosEventBus
-    -> historic-likes user projection queue
-    -> historic-likes image projection queue
-      -> DynamoDB read models
+```bash
+pnpm run website:deploy
+pnpm run ui:url
 ```
 
-The photos service publishes projection events with source `uptick.photos`:
+**Deploy everything in the expected order**
+
+```bash
+pnpm run deploy-everything
+```
+
+**Seed, reset, and simulate activity**
+
+```bash
+pnpm run data:seed          # upload starter images and publish image events
+pnpm run simulator:start    # create like/unlike traffic from terminal users
+pnpm -C services/photos-service run simulator:latest
+pnpm run data:reset         # clear photos data, historic projections, and Cognito test users
+```
+
+**Useful service tests**
+
+```bash
+pnpm -C services/photos-service run test:security
+pnpm -C services/historic-likes-service run test:public-api
+```
+
+**Tear down**
+
+```bash
+pnpm run destroy-everything
+pnpm run bootstrap-down
+```
+
+## Microservices
+
+### Cognito Service
+
+#### Service Overview
+
+The Cognito service owns sign-up, sign-in, hosted UI configuration, and the post-confirmation event that tells the rest of the system a user exists. It keeps authentication separate from the photo database while still letting app users appear in the gallery experience.
+
+#### Commands
+
+```bash
+pnpm run cognito-service:deploy
+pnpm -C services/cognito-service run data:reset
+pnpm run cognito-service:destroy
+```
+
+#### Endpoints
+
+Cognito is reached through its hosted UI and OAuth endpoints rather than the application REST APIs. A realistic deployed domain looks like:
+
+```text
+http://uptick-auth-a1b2c3d4.auth.eu-west-1.amazoncognito.com/login
+http://uptick-auth-a1b2c3d4.auth.eu-west-1.amazoncognito.com/logout
+http://uptick-auth-a1b2c3d4.auth.eu-west-1.amazoncognito.com/oauth2/token
+```
+
+#### Event Queues
+
+**CognitoEventBus**
+
+Subscribers: `photos-service` through `CognitoSignupQueue`.
+
+Messages:
+
+```text
+user.created
+```
+
+#### Databases And Caches
+
+Cognito owns the user pool. The photos service stores an app-facing user row after it receives the signup event.
+
+#### SSM Parameters And Secrets
+
+```text
+/cognito/domain
+/cognito/client-id
+/cognito/user-pool-id
+/cognito/events/event-bus-name
+```
+
+### Photos Service
+
+#### Service Overview
+
+The photos service owns the photo catalogue, image uploads, current like state, simulator endpoints, and the outbound domain events used by the analytics services. It is the main user-facing backend for the gallery.
+
+#### Commands
+
+```bash
+pnpm run photos-service:deploy
+pnpm -C services/photos-service run database:migrate
+pnpm -C services/photos-service run database:reset
+pnpm -C services/photos-service run data:seed
+pnpm -C services/photos-service run data:reset
+pnpm -C services/photos-service run simulator:start
+pnpm -C services/photos-service run test:security
+pnpm run photos-service:destroy
+```
+
+#### Endpoints
+
+```text
+http://photos-api-a1b2c3d4.execute-api.eu-west-1.amazonaws.com/health
+http://photos-api-a1b2c3d4.execute-api.eu-west-1.amazonaws.com/gallery-photos
+http://photos-api-a1b2c3d4.execute-api.eu-west-1.amazonaws.com/images/{imageId}
+http://photos-api-a1b2c3d4.execute-api.eu-west-1.amazonaws.com/auth/photos/gallery
+http://photos-api-a1b2c3d4.execute-api.eu-west-1.amazonaws.com/auth/photos/presigned-url
+http://photos-api-a1b2c3d4.execute-api.eu-west-1.amazonaws.com/auth/photos/{imageId}/like
+http://photos-api-a1b2c3d4.execute-api.eu-west-1.amazonaws.com/auth/users/me
+http://photos-api-a1b2c3d4.execute-api.eu-west-1.amazonaws.com/auth/users/me/nickname
+http://photos-api-a1b2c3d4.execute-api.eu-west-1.amazonaws.com/auth/admin/member
+http://photos-api-a1b2c3d4.execute-api.eu-west-1.amazonaws.com/auth/admin/photos
+http://photos-api-a1b2c3d4.execute-api.eu-west-1.amazonaws.com/simulation/tick
+http://photos-api-a1b2c3d4.execute-api.eu-west-1.amazonaws.com/simulation/likes
+```
+
+The `/auth/...` routes expect a signed-in user. The `/simulation/...` routes are for repeatable demos and use the simulator secret rather than a browser session.
+
+#### Event Queues
+
+**PhotosEventBus**
+
+Subscribers: `historic-likes-service` user projection consumer and image projection consumer.
+
+Messages:
 
 ```text
 user.created
@@ -172,21 +279,11 @@ image.updated
 image.deleted
 ```
 
-The historic likes service builds DynamoDB user and image projections from that stream. Those projections let the analytics service understand authors and photos without reaching back into the photos service database.
+**LikesEventsTopic**
 
-**Like events**
+Subscribers: `historic-likes-service` through `HistoricLikesQueue`.
 
-```text
-photos-service
-  -> SNS LikesEventsTopic
-    -> SQS HistoricLikesQueue
-      -> historic-likes like consumer
-        -> DynamoDB aggregate tables
-```
-
-Like events use SNS because later versions can subscribe more independent services to the same stream. In AWS 07 there is one subscriber: the historic likes service.
-
-The like event types are:
+Messages:
 
 ```text
 like.created
@@ -194,9 +291,17 @@ like.deleted
 likes.deleted.all
 ```
 
-## Data Ownership
+**CognitoSignupQueue**
 
-**Photos service Postgres tables**
+Owner: photos service. Subscriber: `cognitoSignupConsumer` inside the photos service.
+
+Messages:
+
+```text
+user.created
+```
+
+#### Databases And Caches
 
 ```text
 registered_user
@@ -204,394 +309,169 @@ images
 image_likes
 ```
 
-Postgres is the source of truth for users known to the app, uploaded image metadata, and the current like state.
+PostgreSQL is the source of truth for app users, images, and current likes. Image files live in S3 and are served through CloudFront.
 
-`image_likes` stores the current relationship between a user and a photo:
-
-```sql
-CREATE TABLE IF NOT EXISTS image_likes (
-    user_sub VARCHAR(255) NOT NULL,
-    image_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (user_sub, image_id)
-);
-```
-
-**Historic likes DynamoDB tables**
+#### SSM Parameters And Secrets
 
 ```text
-UsersProjectionTable
-ImagesProjectionTable
-HistoricPhotoBucketLikes
-HistoricAuthorBucketLikes
-```
-
-The projection tables hold the latest user and image read models. The aggregate tables hold sparse historic like buckets for images and authors.
-
-## Service APIs
-
-### Photos service
-
-The photos service is an Express app adapted to Lambda with `@codegenie/serverless-express`.
-
-Public routes:
-
-```text
-GET    /public/health
-GET    /public/gallery-photos
-GET    /public/images/:imageId
-POST   /public/simulation/tick
-DELETE /public/simulation/likes
-```
-
-Authenticated routes:
-
-```text
-GET  /auth/photos/gallery
-POST /auth/photos/presigned-url
-POST /auth/photos/:imageId/like
-GET  /auth/users/me
-PUT  /auth/users/me/nickname
-GET  /auth/admin/member
-DELETE /auth/admin/photos
-```
-
-Anonymous users use `GET /public/gallery-photos`. Signed-in users use `GET /auth/photos/gallery`, which adds `likedByCurrentUser` to each photo where appropriate.
-
-Toggling a like uses:
-
-```text
-POST /auth/photos/{imageId}/like
-```
-
-It returns the new current state:
-
-```json
-{
-  "liked": true
-}
-```
-
-The toggle writes to Postgres inside a transaction. After the transaction commits, the photos service publishes a `like.created` or `like.deleted` event to SNS.
-
-### Historic likes service
-
-The historic likes service intentionally does not use Express. It has a small direct Lambda handler behind API Gateway.
-
-Public routes:
-
-```text
-GET /public/health
-GET /public/photo-likes?imageId=<image-id>
-GET /public/author-likes?userId=<author-user-id>
-```
-
-`photoId` is accepted as an alias for `imageId`. `authorUserId` is accepted as an alias for `userId`.
-
-With an ID, each endpoint returns chart data for one photo or one author. The response includes a fixed window of buckets, filling missing buckets with zero so the UI can render stable charts:
-
-```json
-{
-  "imageId": "1",
-  "minutes": [
-    {
-      "offsetMinutes": 14,
-      "label": "T-14 minutes",
-      "minuteBucket": "2026-06-10T14:23Z",
-      "likes": 0
-    }
-  ]
-}
-```
-
-Without an ID, the endpoints return an activity report across all photos or authors for diagnostics and terminal reporting.
-
-## UI Behaviour
-
-The UI keeps the original gallery workflow and adds historic analytics:
-
-- anonymous users can browse and search photos
-- signed-in users can like and unlike photos
-- the gallery shows a heart button only for signed-in users
-- a filled heart means the current user has liked the photo
-- upload and profile links appear only when signed in
-- each gallery tile has an analytics icon
-- clicking the analytics icon opens a full-screen overlay
-- the overlay shows historic author and image charts for the selected photo
-- charts call the historic likes API directly and do not require Cognito
-
-The overlay uses the selected image as a faded background and renders plain SVG charts. The historic likes API fills missing buckets, so the UI always receives a consistent chart shape.
-
-## Seed Data
-
-Seed photos live at the repository root:
-
-```text
-photos-to-upload
-```
-
-The seed script is owned by the photos service:
-
-```text
-monorepo/services/photos-service/scripts/src/init-images.ts
-```
-
-It:
-
-1. reads the image bucket name from SSM at `/photos/images/bucket-name`
-2. reads local files from `../photos-to-upload` relative to the repository root through the service script default
-3. creates seed users
-4. uploads photos to S3
-5. inserts or updates rows in Postgres
-6. publishes matching `user.created` and `image.created` events to `PhotosEventBus`
-
-The reworked seed model creates artwork authors and simulator viewers. Artwork is assigned to `author-*` users, and simulator activity uses `viewer-*` users.
-
-Run seeding from the monorepo:
-
-```bash
-cd monorepo
-pnpm run data:seed
-```
-
-Override the photo folder if needed:
-
-```bash
-PHOTOS_DIR=/absolute/path/to/photos pnpm -C services/photos-service run data:seed
-```
-
-## Simulator
-
-The simulator creates realistic historic like activity without using the browser.
-
-Start it from the monorepo:
-
-```bash
-pnpm run simulator:start
-```
-
-The script:
-
-1. clears current Postgres likes by calling the simulator reset endpoint
-2. publishes a `likes.deleted.all` event
-3. calls `POST /public/simulation/tick` every few seconds
-4. creates likes for random unliked viewer/photo pairs
-5. stops when the tick limit is reached or no unliked pairs remain
-
-Inspect the latest simulator data:
-
-```bash
-pnpm -C services/photos-service run simulator:latest
-```
-
-Use `data:reset` when you want to clear the full deployed environment. Use `simulator:start` when you only want fresh like activity.
-
-## SSM Parameters
-
-The deployed services communicate through service-owned SSM parameters:
-
-```text
-/photos/events/event-bus-name
-/photos/events/likes-topic-arn
+/services/photos-service/base-url
+/photos/rds/secret-arn
 /photos/images/bucket-name
 /photos/images/distribution-url
-/photos/rds/secret-arn
+/photos/events/event-bus-name
+/photos/events/likes-topic-arn
 /photos/cognito-signup/queue-url
+/simulator/secret
+```
 
-/cognito/domain
-/cognito/client-id
+Consumed parameters:
+
+```text
 /cognito/user-pool-id
 /cognito/events/event-bus-name
+```
 
+### Historic Likes Service
+
+#### Service Overview
+
+The historic likes service turns photo, user, and like events into DynamoDB read models for longer-running analytics. The browser reads charts from this service instead of asking the photos database to perform reporting work.
+
+#### Commands
+
+```bash
+pnpm run historic-likes-service:deploy
+pnpm -C services/historic-likes-service run data:reset
+pnpm -C services/historic-likes-service run test:public-api
+pnpm run historic-likes-service:destroy
+```
+
+#### Endpoints
+
+```text
+http://historic-likes-api-e5f6g7h8.execute-api.eu-west-1.amazonaws.com/public/health
+http://historic-likes-api-e5f6g7h8.execute-api.eu-west-1.amazonaws.com/public/photo-likes
+http://historic-likes-api-e5f6g7h8.execute-api.eu-west-1.amazonaws.com/public/photo-likes?imageId={imageId}
+http://historic-likes-api-e5f6g7h8.execute-api.eu-west-1.amazonaws.com/public/author-likes
+http://historic-likes-api-e5f6g7h8.execute-api.eu-west-1.amazonaws.com/public/author-likes?authorUserId={userId}
+```
+
+#### Event Queues
+
+**HistoricLikesQueue**
+
+Owner: historic likes service. Publisher path: `photos-service` -> `LikesEventsTopic` -> `HistoricLikesQueue`.
+
+Messages:
+
+```text
+like.created
+like.deleted
+likes.deleted.all
+```
+
+**Projection Queues**
+
+Owner: historic likes service. Publisher path: `photos-service` -> `PhotosEventBus` -> projection consumers.
+
+Messages:
+
+```text
+user.created
+user.updated
+user.deleted
+image.created
+image.updated
+image.deleted
+```
+
+#### Databases And Caches
+
+```text
+HistoricLikesUsersTable
+HistoricLikesImagesTable
+HistoricPhotoBucketLikesTable
+HistoricAuthorBucketLikesTable
+```
+
+The projection tables keep enough user and image context for analytics screens. The bucket tables hold accumulated like deltas by photo and by author.
+
+#### SSM Parameters And Secrets
+
+```text
 /historic-likes/users-table-name
 /historic-likes/images-table-name
 /historic-likes/photo-bucket-likes-table-name
 /historic-likes/author-bucket-likes-table-name
 /historic-likes/queue-url
+/services/historic-likes-service/base-url
+```
 
+Consumed parameters:
+
+```text
+/photos/events/event-bus-name
+/photos/events/likes-topic-arn
+```
+
+## UI App
+
+### React UI
+
+#### App Overview
+
+The single React app provides the gallery, upload flow, authenticated profile surface, current like buttons, and analytics overlay. It talks to the photos service for catalogue actions and to the analytics services for charts.
+
+#### Commands
+
+```bash
+pnpm -C apps/ui run deploy
+pnpm -C apps/ui run generate-env
+pnpm -C apps/ui run build
+pnpm -C apps/ui run upload
+pnpm -C apps/ui run invalidate-cloudfront
+pnpm -C apps/ui run url
+pnpm -C apps/ui run destroy
+```
+
+#### SSM Parameters Consumed
+
+```text
+/website/bucket-name
+/website/distribution-id
+/website/distribution-url
+/cognito/domain
+/cognito/client-id
+/cognito/user-pool-id
 /services/photos-service/base-url
 /services/historic-likes-service/base-url
 ```
 
-The UI env generation script reads the public service URLs and Cognito settings from SSM and writes `monorepo/apps/ui/.env`.
+#### SSM Parameters Stored
 
-## Run The Full Version
-
-From the repository root:
-
-```bash
-cd monorepo
-pnpm install
-pnpm run deploy-everything
-pnpm run data:seed
+```text
+/website/bucket-name
+/website/distribution-id
+/website/distribution-url
 ```
-
-`deploy-everything`:
-
-1. deploys website hosting infrastructure from `apps/ui/cdk`
-2. deploys Cognito and the post-confirmation trigger from `services/cognito-service/cdk`
-3. deploys `photos-service-stack` from `services/photos-service/cdk`, then runs Flyway migrations
-4. deploys `historic-likes-service-stack` from `services/historic-likes-service/cdk`
-5. deploys the website UI
-
-Deploy Cognito before the photos service. The photos service imports `/cognito/user-pool-id` and `/cognito/events/event-bus-name`.
-
-The photos service stack is the slow step on a cold account because it creates Aurora and CloudFront resources. Allow 30 to 45 minutes.
-
-After deployment:
-
-```bash
-pnpm run type-check
-pnpm -C services/photos-service run test:security
-pnpm -C services/historic-likes-service run test:public-api
-pnpm run ui:url
-```
-
-## Independent Service Commands
-
-Deploy one service or app:
-
-```bash
-pnpm run cognito-service:deploy
-pnpm run photos-service:deploy
-pnpm run historic-likes-service:deploy
-pnpm run website:deploy
-```
-
-Destroy one service or app:
-
-```bash
-pnpm run website:destroy
-pnpm run historic-likes-service:destroy
-pnpm run photos-service:destroy
-pnpm run cognito-service:destroy
-```
-
-Service-local commands:
-
-```bash
-pnpm -C services/photos-service run database:migrate
-pnpm -C services/photos-service run database:reset
-pnpm -C services/photos-service run data:seed
-pnpm -C services/photos-service run data:reset
-pnpm -C services/historic-likes-service run data:reset
-pnpm -C services/cognito-service run data:reset
-```
-
-Run the UI locally against deployed services:
-
-```bash
-pnpm -C apps/ui run generate-env
-pnpm -C apps/ui run dev
-```
-
-Deploy only the UI after frontend changes:
-
-```bash
-pnpm -C apps/ui run generate-env
-pnpm run website:deploy
-```
-
-Clean package artifacts:
-
-```bash
-pnpm run package-cleanup
-```
-
-Destroy everything:
-
-```bash
-pnpm run destroy-everything
-```
-
-## Data Reset
-
-Reset deployed data back to a clean baseline:
-
-```bash
-pnpm run data:reset
-pnpm run data:seed
-```
-
-`data:reset` delegates to service-owned reset scripts:
-
-1. **photos service** migrates Postgres, clears `image_likes`, `images`, and `registered_user`, restores the `system` user, and empties the image bucket.
-2. **historic likes service** purges the likes queue and clears DynamoDB projection and aggregate tables.
-3. **cognito service** deletes Cognito users.
-
-The reset path does not reseed automatically. Run `pnpm run data:seed` after reset.
-
-If you need the script-managed Cognito test users recreated, run:
-
-```bash
-pnpm -C services/photos-service run test:security
-```
-
-## Expected Behaviour
-
-- Each deployable owner has its own CDK folder.
-- The root package delegates deployment, destroy, reset, and test commands to owner packages.
-- Cognito sign-up creates app users through the event path, not through a direct Postgres write in the Cognito trigger.
-- The public gallery shows seeded artwork owned by `author-*` users.
-- Anonymous users can browse and open historic analytics.
-- Signed-in users can like and unlike photos.
-- Current like state is stored in Postgres.
-- The photos service publishes user and image projection events to `PhotosEventBus`.
-- The photos service publishes like events to SNS.
-- The historic likes service consumes projection events and like events into DynamoDB.
-- The public historic API returns chart data without Cognito.
-- The analytics overlay shows author and image historic likes.
-- `simulator:start` generates historic activity for the charts.
-- `pnpm run data:reset` followed by `pnpm run data:seed` returns the environment to the post-deploy baseline.
-- `pnpm run type-check` passes.
 
 ## Troubleshooting
 
-If deployment fails because an old stack still exists, delete the older CloudFormation stacks manually before redeploying. This reworked version expects owner-local stacks:
+- If the UI has empty API URLs, run the relevant `generate-env` script after backend deployment.
+- If sign-in works but the app cannot find the user profile, run `pnpm run data:seed` or sign up again so the Cognito signup event reaches the photos service.
+- If analytics are empty after seeding, wait a few seconds for SQS/Lambda consumers, then run the public API test for the affected service.
+- If a reset appears partial, run `pnpm run data:reset` from the root so photos, historic likes, and Cognito are cleared together.
+- If CloudFormation says a stack already exists, destroy the owner stack from its package script and redeploy in dependency order.
+
+
+## Interesting Code Snippets New To This Release
+
+### Event Payloads Are Shared Contracts
 
 ```text
-website-stack
-cognito-post-confirmation-stack
-cognito-stack
-photos-service-stack
-historic-likes-service-stack
+like.created
+like.deleted
+likes.deleted.all
 ```
 
-Older snapshots used names such as `api-stack`, `core-service-stack`, `events-stack`, `images-stack`, or `rds-stack`.
-
-If the UI has stale service URLs, regenerate env values and redeploy the website:
-
-```bash
-pnpm -C apps/ui run generate-env
-pnpm run website:deploy
-```
-
-If the gallery is empty after a reset, run:
-
-```bash
-pnpm run data:seed
-```
-
-If charts stay flat, run the simulator and wait for events to move through SNS, SQS, Lambda, and DynamoDB:
-
-```bash
-pnpm run simulator:start
-```
-
-## Source Material Folded Into This Version
-
-This reworked lesson synthesizes the content that originally appeared across:
-
-- `aws07-historic-likes-microservice/00-starting-point`
-- `aws07-historic-likes-microservice/01-ui-like-buttons`
-- `aws07-historic-likes-microservice/02-api-eventbridge-projection-events`
-- `aws07-historic-likes-microservice/03-historic-service-eventbridge-projections`
-- `aws07-historic-likes-microservice/04-publish-like-sns-events`
-- `aws07-historic-likes-microservice/05-consume-like-sqs-events`
-- `aws07-historic-likes-microservice/06-like-simulator`
-- `aws07-historic-likes-microservice/07-historic-likes-api`
-- `aws07-historic-likes-microservice/08-ui-historic-analytics`
-- `aws07-historic-likes-microservice/09-independent-microservices`
-- `aws09-backend-microservice-ownership/01-service-owned-infrastructure`
-
-The current version keeps the learning content, but updates names and paths to the reworked architecture: `photos-service`, `PhotosEventBus`, `/photos/...` SSM parameters, owner-local CDK folders, and no realtime likes service.
+The photos service publishes like events once. Historic and realtime services decide for themselves how to store and serve those events.
