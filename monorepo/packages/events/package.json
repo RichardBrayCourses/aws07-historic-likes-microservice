@@ -1,0 +1,12 @@
+{
+  "name": "@uptick/events",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "package-cleanup": "rm -rf node_modules"
+  }
+}

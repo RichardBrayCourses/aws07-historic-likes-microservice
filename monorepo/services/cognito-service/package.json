@@ -1,0 +1,28 @@
+{
+  "name": "@services/cognito-service",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "type-check": "tsc --noEmit && tsc --noEmit -p cdk/tsconfig.json",
+    "deploy": "cdk deploy cognito-post-confirmation-stack cognito-stack --require-approval never --app \"tsx ./cdk/src/bin/cognito.ts\"",
+    "destroy": "cdk destroy cognito-stack cognito-post-confirmation-stack --force --require-approval never --app \"tsx ./cdk/src/bin/cognito.ts\"",
+    "data:reset": "tsx scripts/src/data-reset.ts",
+    "package-cleanup": "rm -rf node_modules cdk.out"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1063.0",
+    "@aws-sdk/client-eventbridge": "^3.1063.0",
+    "@aws-sdk/client-ssm": "^3.1063.0",
+    "@uptick/events": "workspace:*",
+    "aws-cdk-lib": "2.235.1",
+    "constructs": "10.4.5"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.161",
+    "@types/node": "^25.9.1",
+    "esbuild": "0.27.7",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  }
+}

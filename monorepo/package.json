@@ -1,0 +1,30 @@
+{
+  "name": "root",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "install:macos": "bash scripts/install-flyway-and-pgadmin-macos.sh",
+    "install:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-flyway-and-pgadmin-windows.ps1",
+    "bootstrap-up": "pnpm -C scripts run bootstrap-up",
+    "bootstrap-down": "pnpm -C scripts run bootstrap-down",
+    "website:deploy": "pnpm -C apps/ui run deploy",
+    "website:destroy": "pnpm -C apps/ui run destroy",
+    "photos-service:deploy": "pnpm -C services/photos-service run deploy",
+    "photos-service:destroy": "pnpm -C services/photos-service run destroy",
+    "historic-likes-service:deploy": "pnpm -C services/historic-likes-service run deploy",
+    "historic-likes-service:destroy": "pnpm -C services/historic-likes-service run destroy",
+    "cognito-service:deploy": "pnpm -C services/cognito-service run deploy",
+    "cognito-service:destroy": "pnpm -C services/cognito-service run destroy",
+    "deploy-everything": "pnpm -C apps/ui run deploy:infra && pnpm run cognito-service:deploy && pnpm run photos-service:deploy && pnpm run historic-likes-service:deploy && pnpm run website:deploy",
+    "destroy-everything": "pnpm run website:destroy && pnpm run historic-likes-service:destroy && pnpm run photos-service:destroy && pnpm run cognito-service:destroy",
+    "data:reset": "pnpm -C services/photos-service run data:reset && pnpm -C services/historic-likes-service run data:reset && pnpm -C services/cognito-service run data:reset",
+    "data:seed": "pnpm -C services/photos-service run data:seed",
+    "simulator:start": "pnpm -C services/photos-service run simulator:start",
+    "ui:url": "pnpm -C apps/ui run url",
+    "type-check": "pnpm -r type-check ",
+    "package-cleanup": "pnpm -r package-cleanup && rm -rf node_modules "
+  },
+  "devDependencies": {
+    "esbuild": "0.27.7"
+  }
+}

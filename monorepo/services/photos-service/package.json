@@ -1,0 +1,48 @@
+{
+  "name": "@services/photos-service",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "type-check": "tsc --noEmit && tsc --noEmit -p cdk/tsconfig.json",
+    "dev": "tsx  src/local.ts",
+    "deploy": "cdk deploy photos-service-stack --require-approval never --app \"tsx ./cdk/src/bin/core.ts\" && pnpm run database:migrate",
+    "destroy": "cdk destroy photos-service-stack --force --require-approval never --app \"tsx ./cdk/src/bin/core.ts\"",
+    "database:migrate": "tsx scripts/src/database-migrate.ts",
+    "database:reset": "tsx scripts/src/database-migrate.ts reset",
+    "database:show-secret": "tsx scripts/src/database-show-secret.ts",
+    "data:reset": "tsx scripts/src/data-reset.ts",
+    "data:seed": "tsx scripts/src/init-images.ts",
+    "simulator:start": "tsx scripts/src/start-like-simulator.ts",
+    "simulator:latest": "tsx scripts/src/simulator-latest.ts",
+    "test:security": "tsx scripts/src/photos-service-test.ts",
+    "package-cleanup": "rm -rf node_modules cdk.out"
+  },
+  "dependencies": {
+    "@uptick/events": "workspace:*",
+    "aws-cdk-lib": "2.235.1",
+    "constructs": "10.4.5",
+    "@aws-sdk/client-eventbridge": "^3.1063.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.1063.0",
+    "@aws-sdk/client-dynamodb": "^3.1063.0",
+    "@aws-sdk/client-s3": "3.972.0",
+    "@aws-sdk/client-secrets-manager": "^3.1063.0",
+    "@aws-sdk/client-sns": "^3.1063.0",
+    "@aws-sdk/client-ssm": "^3.1063.0",
+    "@aws-sdk/lib-dynamodb": "^3.1063.0",
+    "@aws-sdk/s3-request-presigner": "3.972.0",
+    "@codegenie/serverless-express": "^5.0.0",
+    "express": "^5.2.1",
+    "pg": "^8.16.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.161",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.9.1",
+    "@types/pg": "^8.15.6",
+    "esbuild": "0.27.7",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  }
+}

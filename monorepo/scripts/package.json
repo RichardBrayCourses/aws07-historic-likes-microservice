@@ -1,0 +1,12 @@
+{
+  "name": "@root/scripts",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "install:macos": "bash install-flyway-and-pgadmin-macos.sh",
+    "install:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File install-flyway-and-pgadmin-windows.ps1",
+    "bootstrap-up": "sh bootstrap-up.sh",
+    "bootstrap-down": "sh bootstrap-down.sh",
+    "package-cleanup": "rm -rf node_modules"
+  }
+}

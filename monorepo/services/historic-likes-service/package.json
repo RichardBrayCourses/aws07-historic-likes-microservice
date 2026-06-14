@@ -1,0 +1,30 @@
+{
+  "name": "@services/historic-likes-service",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "type-check": "tsc --noEmit && tsc --noEmit -p cdk/tsconfig.json",
+    "deploy": "cdk deploy historic-likes-service-stack --require-approval never --app \"tsx ./cdk/src/bin/historicLikes.ts\"",
+    "destroy": "cdk destroy historic-likes-service-stack --force --require-approval never --app \"tsx ./cdk/src/bin/historicLikes.ts\"",
+    "data:reset": "tsx scripts/src/data-reset.ts",
+    "test:public-api": "bash scripts/historic-likes-service-test.sh",
+    "package-cleanup": "rm -rf node_modules cdk.out"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1063.0",
+    "@aws-sdk/client-sqs": "^3.1066.0",
+    "@aws-sdk/client-ssm": "^3.1063.0",
+    "@aws-sdk/lib-dynamodb": "^3.1063.0",
+    "@uptick/events": "workspace:*",
+    "aws-cdk-lib": "2.235.1",
+    "constructs": "10.4.5"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.161",
+    "@types/node": "^25.9.1",
+    "esbuild": "0.27.7",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  }
+}
